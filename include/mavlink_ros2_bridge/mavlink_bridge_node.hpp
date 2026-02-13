@@ -8,6 +8,8 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
+#include <bme_common_msgs/msg/gnss_solution.hpp>
+#include <bme_common_msgs/msg/mav_modes.hpp>
 
 #include <common/mavlink.h>
 #include "mavlink_ros2_bridge/udp_socket.hpp"
@@ -73,13 +75,12 @@ private:
     rclcpp::TimerBase::SharedPtr mission_request_timer_;
 
     // --- Subscribers ---
-    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr gnss_sub_;
+    rclcpp::Subscription<bme_common_msgs::msg::GnssSolution>::SharedPtr gnss_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr auto_log_sub_;
-    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr heading_sub_;
 
     // --- Publishers ---
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr mission_pub_;
-    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr modes_pub_;
+    rclcpp::Publisher<bme_common_msgs::msg::MavModes>::SharedPtr modes_pub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr joystick_pub_;
     rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr mission_set_current_pub_;
 
@@ -89,9 +90,8 @@ private:
     void onMissionRequestTimer();
 
     // --- Subscriber callbacks ---
-    void onGnssReceived(const std_msgs::msg::Float64MultiArray::SharedPtr msg);
+    void onGnssReceived(const bme_common_msgs::msg::GnssSolution::SharedPtr msg);
     void onAutoLogReceived(const std_msgs::msg::Float64MultiArray::SharedPtr msg);
-    void onHeadingReceived(const std_msgs::msg::Float64MultiArray::SharedPtr msg);
 
     // --- MAVLink message dispatch ---
     void handleMavlinkMessage(const mavlink_message_t& msg);

@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(bme_common_msgs REQUIRED)
 
 # Source files
 add_executable(mavlink_bridge_node
@@ -34,6 +35,7 @@ ament_target_dependencies(mavlink_bridge_node
   rclcpp
   std_msgs
   geometry_msgs
+  bme_common_msgs
 )
 
 install(TARGETS mavlink_bridge_node

@@ -1,6 +1,7 @@
 #include "mavlink_ros2_bridge/mavlink_bridge_node.hpp"
 
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <sys/time.h>
 
@@ -53,8 +54,8 @@ MAVLinkBridgeNode::MAVLinkBridgeNode()
     RCLCPP_INFO(get_logger(), "MAVLink bridge started — GCS: %s:%d", gcs_ip_.c_str(), REMOTE_PORT);
 
     // --- Subscribers ---
-    // /gnss: [lat_deg, lon_deg, alt_mm, fix_status(0-2), num_satellites]
-    gnss_sub_ = create_subscription<std_msgs::msg::Float64MultiArray>(
+    // /gnss: bme_common_msgs/GnssSolution
+    gnss_sub_ = create_subscription<bme_common_msgs::msg::GnssSolution>(
         "/gnss", 10,
         std::bind(&MAVLinkBridgeNode::onGnssReceived, this, std::placeholders::_1));
 
@@ -63,14 +64,10 @@ MAVLinkBridgeNode::MAVLinkBridgeNode()
         "/auto_log", 1,
         std::bind(&MAVLinkBridgeNode::onAutoLogReceived, this, std::placeholders::_1));
 
-    // /heading: [yaw_rad, fix_status(0-2)]
-    heading_sub_ = create_subscription<std_msgs::msg::Float64MultiArray>(
-        "/heading", 1,
-        std::bind(&MAVLinkBridgeNode::onHeadingReceived, this, std::placeholders::_1));
 
     // --- Publishers ---
     mission_pub_             = create_publisher<std_msgs::msg::Float64MultiArray>("/mav/mission", 1000);
-    modes_pub_               = create_publisher<std_msgs::msg::Int32MultiArray>("/mav/modes", 1);
+    modes_pub_               = create_publisher<bme_common_msgs::msg::MavModes>("/mav/modes", 1);
     joystick_pub_            = create_publisher<geometry_msgs::msg::TwistStamped>("/mav/joystick", 1);
     mission_set_current_pub_ = create_publisher<std_msgs::msg::UInt16>("/mav/mission_set_current", 10);
 
@@ -89,21 +86,22 @@ MAVLinkBridgeNode::MAVLinkBridgeNode()
 // ---------------------------------------------------------------------------
 // Subscriber callbacks
 // ---------------------------------------------------------------------------
-void MAVLinkBridgeNode::onGnssReceived(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+void MAVLinkBridgeNode::onGnssReceived(const bme_common_msgs::msg::GnssSolution::SharedPtr msg)
 {
-    if (msg->data.size() < 5) {
-        return;
-    }
-    gps_lat_        = static_cast<int32_t>(msg->data[0] * 1e7);
-    gps_lon_        = static_cast<int32_t>(msg->data[1] * 1e7);
-    gps_alt_        = static_cast<int32_t>(msg->data[2]);
-    gps_satellites_ = static_cast<uint8_t>(msg->data[4]);
+    gps_lat_        = static_cast<int32_t>(msg->latitude * 1e7);
+    gps_lon_        = static_cast<int32_t>(msg->longitude * 1e7);
+    gps_alt_        = static_cast<int32_t>(msg->height * 1000);  // m → mm
+    gps_satellites_ = msg->num_sv;
 
-    switch (static_cast<int>(msg->data[3])) {
+    switch (msg->position_rtk_status) {
         case 2:  gps_fix_type_ = GPS_FIX_TYPE_RTK_FIXED; break;
         case 1:  gps_fix_type_ = GPS_FIX_TYPE_RTK_FLOAT; break;
         default: gps_fix_type_ = GPS_FIX_TYPE_DGPS;      break;
     }
+
+    // Heading
+    yaw_ = msg->heading_deg * M_PI / 180.0;
+    estimator_flags_ = (msg->heading_rtk_status == 2) ? 1 : 0;
 }
 
 void MAVLinkBridgeNode::onAutoLogReceived(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
@@ -116,16 +114,6 @@ void MAVLinkBridgeNode::onAutoLogReceived(const std_msgs::msg::Float64MultiArray
     angular_z_         = static_cast<float>(msg->data[2]);
 }
 
-void MAVLinkBridgeNode::onHeadingReceived(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
-{
-    if (msg->data.size() < 2) {
-        return;
-    }
-    yaw_ = msg->data[0];
-
-    int fix_status = static_cast<int>(msg->data[1]);
-    estimator_flags_ = (fix_status == 2) ? 1 : 0;  // ESTIMATOR_ATTITUDE
-}
 
 // ---------------------------------------------------------------------------
 // Heartbeat timer — periodic telemetry to GCS (~900 ms)
@@ -175,12 +163,11 @@ void MAVLinkBridgeNode::onHeartbeatTimer()
 
     // Publish modes to ROS
     {
-        std_msgs::msg::Int32MultiArray modes_msg;
-        modes_msg.data = {
-            static_cast<int32_t>(base_mode_),
-            static_cast<int32_t>(custom_mode_),
-            static_cast<int32_t>(mission_start_ ? 1 : 0)
-        };
+        bme_common_msgs::msg::MavModes modes_msg;
+        modes_msg.header.stamp = this->now();
+        modes_msg.base_mode = static_cast<int16_t>(base_mode_);
+        modes_msg.custom_mode = static_cast<int16_t>(custom_mode_);
+        modes_msg.mission_start = mission_start_;
         modes_pub_->publish(modes_msg);
     }
 
