@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -106,6 +107,11 @@ private:
     void handleManualControl(const mavlink_message_t& msg);
     void handleMissionItemInt(const mavlink_message_t& msg);
     void handleCommandLong(const mavlink_message_t& msg);
+
+    // --- Parameter persistence ---
+    std::string param_file_path_;
+    std::map<std::string, double> loadParameters();
+    void saveParameters();
 
     // --- Helpers ---
     void sendMavlinkMessage(mavlink_message_t& msg);

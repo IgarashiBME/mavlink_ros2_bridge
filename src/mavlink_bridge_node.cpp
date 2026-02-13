@@ -3,6 +3,10 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 #include <sys/time.h>
 
 using namespace std::chrono_literals;
@@ -41,9 +45,27 @@ MAVLinkBridgeNode::MAVLinkBridgeNode()
     declare_parameter<int>("mission_total_seq", 0);
     mission_total_seq_ = get_parameter("mission_total_seq").as_int();
 
-    // Declare QGC-exposed parameters
+    // Parameter persistence file path
+    declare_parameter<std::string>("param_file_path", "~/.ros/mavlink_bridge_params.yaml");
+    param_file_path_ = get_parameter("param_file_path").as_string();
+    if (param_file_path_.rfind("~/", 0) == 0) {
+        const char* home = std::getenv("HOME");
+        if (home) {
+            param_file_path_ = std::string(home) + param_file_path_.substr(1);
+        }
+    }
+
+    // Load saved parameter values (if any)
+    auto saved = loadParameters();
+
+    // Declare QGC-exposed parameters (use saved values as defaults when available)
     for (const auto& entry : paramEntries()) {
-        declare_parameter<double>(entry.name, static_cast<double>(entry.default_value));
+        double default_val = static_cast<double>(entry.default_value);
+        auto it = saved.find(entry.name);
+        if (it != saved.end()) {
+            default_val = it->second;
+        }
+        declare_parameter<double>(entry.name, default_val);
     }
 
     // Open UDP socket: receive on 14551, send to GCS on 14550
@@ -200,6 +222,7 @@ void MAVLinkBridgeNode::onReceiveTimer()
             set_parameter(rclcpp::Parameter(
                 std::string(pending_param_id_),
                 static_cast<double>(pending_param_value_)));
+            saveParameters();
         } catch (const rclcpp::exceptions::ParameterNotDeclaredException&) {
             RCLCPP_WARN(get_logger(), "Parameter '%s' not declared, skipping update",
                          pending_param_id_);
@@ -524,6 +547,72 @@ uint64_t MAVLinkBridgeNode::microsSinceEpoch() const
     struct timeval tv;
     gettimeofday(&tv, nullptr);
     return static_cast<uint64_t>(tv.tv_sec) * 1000000ULL + tv.tv_usec;
+}
+
+// ---------------------------------------------------------------------------
+// Parameter persistence
+// ---------------------------------------------------------------------------
+std::map<std::string, double> MAVLinkBridgeNode::loadParameters()
+{
+    std::map<std::string, double> result;
+    std::ifstream ifs(param_file_path_);
+    if (!ifs.is_open()) {
+        return result;
+    }
+
+    std::string line;
+    while (std::getline(ifs, line)) {
+        auto colon = line.find(':');
+        if (colon == std::string::npos) {
+            continue;
+        }
+        std::string key = line.substr(0, colon);
+        std::string val_str = line.substr(colon + 1);
+
+        // Trim whitespace
+        key.erase(0, key.find_first_not_of(" \t"));
+        key.erase(key.find_last_not_of(" \t") + 1);
+        val_str.erase(0, val_str.find_first_not_of(" \t"));
+        val_str.erase(val_str.find_last_not_of(" \t") + 1);
+
+        if (key.empty() || val_str.empty()) {
+            continue;
+        }
+
+        try {
+            result[key] = std::stod(val_str);
+        } catch (...) {
+            RCLCPP_WARN(get_logger(), "Failed to parse parameter '%s: %s'",
+                         key.c_str(), val_str.c_str());
+        }
+    }
+
+    RCLCPP_INFO(get_logger(), "Loaded %zu parameters from %s",
+                 result.size(), param_file_path_.c_str());
+    return result;
+}
+
+void MAVLinkBridgeNode::saveParameters()
+{
+    std::filesystem::path filepath(param_file_path_);
+    auto parent = filepath.parent_path();
+    if (!parent.empty() && !std::filesystem::exists(parent)) {
+        std::filesystem::create_directories(parent);
+    }
+
+    std::ofstream ofs(param_file_path_);
+    if (!ofs.is_open()) {
+        RCLCPP_ERROR(get_logger(), "Failed to open %s for writing",
+                      param_file_path_.c_str());
+        return;
+    }
+
+    for (const auto& entry : paramEntries()) {
+        double value = get_parameter(entry.name).as_double();
+        ofs << entry.name << ": " << value << "\n";
+    }
+
+    RCLCPP_INFO(get_logger(), "Saved parameters to %s", param_file_path_.c_str());
 }
 
 // ---------------------------------------------------------------------------
