@@ -24,6 +24,17 @@ const std::vector<MAVLinkBridgeNode::ParamEntry>& MAVLinkBridgeNode::paramEntrie
         {"i_control_dist",  0.0f},
         {"i_limit",         0.0f},
         {"linear_velocity", 0.0f},
+        {"pivot_threshold",  40.0f},
+        {"cte_threshold",   0.1f},
+        {"wp_arrival_dist", 0.1f},
+        {"wp_skip_dist",    0.8f},
+        {"throttle_scale",  0.5f},
+        {"pivot_scale",     0.5f},
+        {"driver_mix",      0.0f},
+        {"pwm_center",      1500.0f},
+        {"pwm_range",       500.0f},
+        {"pwm_min",         1000.0f},
+        {"pwm_max",         2000.0f},
     };
     return entries;
 }
