@@ -9,6 +9,7 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
+#include <bme_common_msgs/msg/auto_log.hpp>
 #include <bme_common_msgs/msg/gnss_solution.hpp>
 #include <bme_common_msgs/msg/mav_modes.hpp>
 
@@ -77,7 +78,7 @@ private:
 
     // --- Subscribers ---
     rclcpp::Subscription<bme_common_msgs::msg::GnssSolution>::SharedPtr gnss_sub_;
-    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr auto_log_sub_;
+    rclcpp::Subscription<bme_common_msgs::msg::AutoLog>::SharedPtr auto_log_sub_;
 
     // --- Publishers ---
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr mission_pub_;
@@ -92,7 +93,7 @@ private:
 
     // --- Subscriber callbacks ---
     void onGnssReceived(const bme_common_msgs::msg::GnssSolution::SharedPtr msg);
-    void onAutoLogReceived(const std_msgs::msg::Float64MultiArray::SharedPtr msg);
+    void onAutoLogReceived(const bme_common_msgs::msg::AutoLog::SharedPtr msg);
 
     // --- MAVLink message dispatch ---
     void handleMavlinkMessage(const mavlink_message_t& msg);

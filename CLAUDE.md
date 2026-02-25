@@ -37,9 +37,16 @@ This is a single ROS2 C++ node (`MAVLinkBridgeNode`) that bridges QGroundControl
 
 **UDP ports:** Binds locally on 14551 (RX), sends to GCS on 14550 (TX).
 
-**QGC-accessible parameters** (synced via MAVLink PARAM_SET/PARAM_REQUEST_LIST): `Kp`, `Ki`, `Kd`, `look_ahead`, `i_control_dist`, `i_limit`, `linear_velocity`. These are standard ROS2 parameters that QGC can read/write through the MAVLink parameter protocol.
+**QGC-accessible parameters** (synced via MAVLink PARAM_SET/PARAM_REQUEST_LIST): `Kp`, `Kcte`, `Ki`, `Kd`, `look_ahead`, `i_control_dist`, `i_limit`, `linear_velocity`, plus output parameters (`throttle_scale`, `pivot_scale`, `driver_mix`, `pwm_center`, `pwm_range`, `pwm_min`, `pwm_max`). Defined in `paramEntries()`. These are standard ROS2 parameters that QGC can read/write through the MAVLink parameter protocol. Parameter values are persisted to `~/.ros/mavlink_bridge_params.yaml` on every PARAM_SET.
 
 **Vehicle identity:** Emulates ArduPilot ground rover (MAV_TYPE_GROUND_ROVER, MAV_AUTOPILOT_ARDUPILOTMEGA, sysid=1, compid=MAV_COMP_ID_AUTOPILOT1).
+
+## QGC Protocol Pitfalls
+
+- **Mission types:** QGC sends MISSION_COUNT for fence (type=1) and rally (type=2) in addition to the main mission (type=0) after a mission upload. The handler must filter by `mission_type == MAV_MISSION_TYPE_MISSION` to avoid overwriting `mission_total_seq_` with 0.
+- **Two mode-change paths:** QGC uses both `SET_MODE` (message ID 11) and `MAV_CMD_DO_SET_MODE` (COMMAND_LONG cmd=176) to change modes. Both handlers must preserve the current ARM state (`base_mode_`), since QGC may send base_mode=1 (unarmed flag) even while the vehicle is armed.
+- **Auto-disarm guard:** The heartbeat timer disarms when `current_seq_ > mission_total_seq_`. If `mission_total_seq_` is incorrectly set to 0 (e.g., by fence/rally MISSION_COUNT), this triggers immediate disarm.
+- **Parameter scope:** QGC PARAM_SET only updates this bridge node's ROS2 parameters. Downstream nodes (e.g., look_ahead_control) must separately sync parameters — see look_ahead_control's `/parameter_events` subscription and startup load from the persistence file.
 
 ## Key Conventions
 

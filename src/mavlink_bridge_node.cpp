@@ -18,6 +18,7 @@ const std::vector<MAVLinkBridgeNode::ParamEntry>& MAVLinkBridgeNode::paramEntrie
 {
     static const std::vector<ParamEntry> entries = {
         {"Kp",              0.0f},
+        {"Kcte",            0.0f},
         {"Ki",              0.0f},
         {"Kd",              0.0f},
         {"look_ahead",      0.0f},
@@ -92,8 +93,8 @@ MAVLinkBridgeNode::MAVLinkBridgeNode()
         "/gnss", 10,
         std::bind(&MAVLinkBridgeNode::onGnssReceived, this, std::placeholders::_1));
 
-    // /auto_log: [waypoint_seq, cross_track_error, angular_z]
-    auto_log_sub_ = create_subscription<std_msgs::msg::Float64MultiArray>(
+    // /auto_log: bme_common_msgs/AutoLog
+    auto_log_sub_ = create_subscription<bme_common_msgs::msg::AutoLog>(
         "/auto_log", 1,
         std::bind(&MAVLinkBridgeNode::onAutoLogReceived, this, std::placeholders::_1));
 
@@ -137,14 +138,11 @@ void MAVLinkBridgeNode::onGnssReceived(const bme_common_msgs::msg::GnssSolution:
     estimator_flags_ = (msg->heading_rtk_status == 2) ? 1 : 0;
 }
 
-void MAVLinkBridgeNode::onAutoLogReceived(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+void MAVLinkBridgeNode::onAutoLogReceived(const bme_common_msgs::msg::AutoLog::SharedPtr msg)
 {
-    if (msg->data.size() < 3) {
-        return;
-    }
-    current_seq_       = static_cast<int>(msg->data[0]);
-    cross_track_error_ = static_cast<float>(msg->data[1]);
-    angular_z_         = static_cast<float>(msg->data[2]);
+    current_seq_       = static_cast<int>(msg->waypoint_seq);
+    cross_track_error_ = static_cast<float>(msg->cross_track_error);
+    angular_z_         = static_cast<float>(msg->angular_z);
 }
 
 
@@ -206,7 +204,11 @@ void MAVLinkBridgeNode::onHeartbeatTimer()
 
     // Mission current (when armed)
     if (base_mode_ == ARDUPILOT_GUIDED_ARMED) {
+        RCLCPP_INFO(get_logger(), "HEARTBEAT: armed, cur_seq=%d total_seq=%d",
+                     current_seq_, mission_total_seq_);
         if (current_seq_ > mission_total_seq_) {
+            RCLCPP_WARN(get_logger(), "AUTO-DISARM: cur_seq(%d) > total_seq(%d)",
+                         current_seq_, mission_total_seq_);
             base_mode_ = ARDUPILOT_GUIDED_DISARMED;
             mission_start_ = false;
         }
@@ -328,10 +330,17 @@ void MAVLinkBridgeNode::handleSetMode(const mavlink_message_t& msg)
     mavlink_msg_set_mode_decode(&msg, &decoded);
 
     custom_mode_ = decoded.custom_mode;
-    base_mode_   = decoded.base_mode;
 
-    RCLCPP_INFO(get_logger(), "SET_MODE: base=%lu custom=%lu",
-                 base_mode_, custom_mode_);
+    // Preserve armed/disarmed state — only ARM/DISARM command should change it
+    bool currently_armed = (base_mode_ == ARDUPILOT_GUIDED_ARMED);
+    if (currently_armed) {
+        base_mode_ = ARDUPILOT_GUIDED_ARMED;
+    } else {
+        base_mode_ = decoded.base_mode;
+    }
+
+    RCLCPP_INFO(get_logger(), "SET_MODE: base=%lu custom=%lu (armed=%d)",
+                 base_mode_, custom_mode_, currently_armed);
 }
 
 void MAVLinkBridgeNode::handleParamRequestList()
@@ -382,10 +391,18 @@ void MAVLinkBridgeNode::handleMissionCount(const mavlink_message_t& msg)
     mavlink_mission_count_t decoded;
     mavlink_msg_mission_count_decode(&msg, &decoded);
 
+    // Ignore fence/rally mission types — only handle main mission (type 0)
+    if (decoded.mission_type != MAV_MISSION_TYPE_MISSION) {
+        RCLCPP_INFO(get_logger(), "MISSION_COUNT: %d items (type=%d, ignored)",
+                     decoded.count, decoded.mission_type);
+        return;
+    }
+
     is_mission_request_ = true;
     mission_total_seq_  = decoded.count;
     mission_seq_        = 0;
     prev_mission_seq_   = -1;
+    current_seq_        = 0;
 
     RCLCPP_INFO(get_logger(), "MISSION_COUNT: %d items", mission_total_seq_);
 
@@ -508,8 +525,12 @@ void MAVLinkBridgeNode::handleCommandLong(const mavlink_message_t& msg)
         case MAV_CMD_DO_SET_MODE: {
             // param1: base_mode (float → uint8_t)
             // param2: custom_mode (float → uint32_t)
-            base_mode_   = static_cast<uint8_t>(decoded.param1);
             custom_mode_ = static_cast<uint32_t>(decoded.param2);
+
+            // Preserve armed state — only ARM/DISARM command should change it
+            if (base_mode_ != ARDUPILOT_GUIDED_ARMED) {
+                base_mode_ = static_cast<uint8_t>(decoded.param1);
+            }
 
             mavlink_msg_command_ack_pack(sys, comp, &ack,
                 decoded.command, MAV_RESULT_ACCEPTED,
