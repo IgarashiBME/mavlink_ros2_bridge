@@ -41,6 +41,9 @@ ament_target_dependencies(mavlink_bridge_node
 install(TARGETS mavlink_bridge_node
   DESTINATION lib/${PROJECT_NAME})
 
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
