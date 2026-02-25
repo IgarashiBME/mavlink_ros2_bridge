@@ -132,8 +132,8 @@ void MAVLinkBridgeNode::onGnssReceived(const bme_common_msgs::msg::GnssSolution:
         default: gps_fix_type_ = GPS_FIX_TYPE_DGPS;      break;
     }
 
-    // Heading
-    yaw_ = msg->heading_deg * M_PI / 180.0;
+    // Heading: ENU (ROS2 REP 103) → NED (MAVLink)
+    yaw_ = M_PI / 2.0 - msg->heading_deg * M_PI / 180.0;
     estimator_flags_ = (msg->heading_rtk_status == 2) ? 1 : 0;
 }
 
