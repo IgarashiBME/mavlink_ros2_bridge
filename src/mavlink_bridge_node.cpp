@@ -391,10 +391,16 @@ void MAVLinkBridgeNode::handleMissionCount(const mavlink_message_t& msg)
     mavlink_mission_count_t decoded;
     mavlink_msg_mission_count_decode(&msg, &decoded);
 
-    // Ignore fence/rally mission types — only handle main mission (type 0)
+    // Fence/rally mission types — ACK immediately but don't process
     if (decoded.mission_type != MAV_MISSION_TYPE_MISSION) {
-        RCLCPP_INFO(get_logger(), "MISSION_COUNT: %d items (type=%d, ignored)",
+        RCLCPP_INFO(get_logger(), "MISSION_COUNT: %d items (type=%d, ACK only)",
                      decoded.count, decoded.mission_type);
+        mavlink_message_t ack;
+        mavlink_msg_mission_ack_pack(
+            mavlink_system_.sysid, mavlink_system_.compid, &ack,
+            msg.sysid, msg.compid,
+            MAV_MISSION_ACCEPTED, decoded.mission_type, 0);
+        sendMavlinkMessage(ack);
         return;
     }
 
