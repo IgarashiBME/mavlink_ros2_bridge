@@ -296,6 +296,9 @@ void MAVLinkBridgeNode::handleMavlinkMessage(const mavlink_message_t& msg)
         case MAVLINK_MSG_ID_PARAM_SET:
             handleParamSet(msg);
             break;
+        case MAVLINK_MSG_ID_MISSION_REQUEST_LIST:
+            handleMissionRequestList(msg);
+            break;
         case MAVLINK_MSG_ID_MISSION_SET_CURRENT:
             handleMissionSetCurrent(msg);
             break;
@@ -372,6 +375,23 @@ void MAVLinkBridgeNode::handleParamSet(const mavlink_message_t& msg)
     pending_param_value_ = decoded.param_value;
     pending_param_type_  = decoded.param_type;
     param_set_pending_   = true;
+}
+
+void MAVLinkBridgeNode::handleMissionRequestList(const mavlink_message_t& msg)
+{
+    mavlink_mission_request_list_t decoded;
+    mavlink_msg_mission_request_list_decode(&msg, &decoded);
+
+    RCLCPP_INFO(get_logger(), "MISSION_REQUEST_LIST: type=%d — responding with count=0",
+                 decoded.mission_type);
+
+    // Respond with MISSION_COUNT = 0 (no stored missions/fence/rally)
+    mavlink_message_t reply;
+    mavlink_msg_mission_count_pack(
+        mavlink_system_.sysid, mavlink_system_.compid, &reply,
+        msg.sysid, msg.compid,
+        0, decoded.mission_type, 0);
+    sendMavlinkMessage(reply);
 }
 
 void MAVLinkBridgeNode::handleMissionSetCurrent(const mavlink_message_t& msg)

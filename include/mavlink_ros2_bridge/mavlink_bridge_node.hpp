@@ -103,6 +103,7 @@ private:
     void handleSetMode(const mavlink_message_t& msg);
     void handleParamRequestList();
     void handleParamSet(const mavlink_message_t& msg);
+    void handleMissionRequestList(const mavlink_message_t& msg);
     void handleMissionSetCurrent(const mavlink_message_t& msg);
     void handleMissionCount(const mavlink_message_t& msg);
     void handleManualControl(const mavlink_message_t& msg);
