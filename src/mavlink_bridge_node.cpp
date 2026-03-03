@@ -33,6 +33,9 @@ const std::vector<MAVLinkBridgeNode::ParamEntry>& MAVLinkBridgeNode::paramEntrie
         {"pwm_min",         1000.0f},
         {"pwm_max",         2000.0f},
         {"steering_reverse", 0.0f},
+        {"cmd_vel_speed",   0.5f},
+        {"cmd_vel_steer_scale", 0.002f},
+        {"cmd_vel_pivot_rate", 0.5f},
     };
     return entries;
 }
