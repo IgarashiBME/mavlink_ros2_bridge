@@ -37,7 +37,7 @@ This is a single ROS2 C++ node (`MAVLinkBridgeNode`) that bridges QGroundControl
 
 **UDP ports:** Binds locally on 14551 (RX), sends to GCS on 14550 (TX).
 
-**QGC-accessible parameters** (synced via MAVLink PARAM_SET/PARAM_REQUEST_LIST): `Kp`, `Kcte`, `Ki`, `Kd`, `look_ahead`, `i_control_dist`, `i_limit`, `linear_velocity`, plus output parameters (`throttle_scale`, `pivot_scale`, `driver_mix`, `pwm_center`, `pwm_range`, `pwm_min`, `pwm_max`). Defined in `paramEntries()`. These are standard ROS2 parameters that QGC can read/write through the MAVLink parameter protocol. Parameter values are persisted to `~/.ros/mavlink_bridge_params.yaml` on every PARAM_SET.
+**QGC-accessible parameters** (synced via MAVLink PARAM_SET/PARAM_REQUEST_LIST): `Kp`, `Kcte`, `Ki`, `Kd`, `look_ahead`, plus output parameters (`throttle_scale`, `pivot_scale`, `driver_mix`, `pwm_center`, `pwm_range`, `pwm_min`, `pwm_max`). Defined in `paramEntries()`. These are standard ROS2 parameters that QGC can read/write through the MAVLink parameter protocol. Parameter values are persisted to `~/.ros/mavlink_bridge_params.yaml` on every PARAM_SET.
 
 **Vehicle identity:** Emulates ArduPilot ground rover (MAV_TYPE_GROUND_ROVER, MAV_AUTOPILOT_ARDUPILOTMEGA, sysid=1, compid=MAV_COMP_ID_AUTOPILOT1).
 

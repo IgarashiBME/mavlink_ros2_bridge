@@ -126,9 +126,6 @@ ros2 run mavlink_ros2_bridge mavlink_ros2_bridge_node --ros-args -p gcs_ip:=192.
 | `Ki` | double | `0.0` | PID 積分ゲイン (QGC公開) |
 | `Kd` | double | `0.0` | PID 微分ゲイン (QGC公開) |
 | `look_ahead` | double | `0.0` | 前方注視距離 (QGC公開) |
-| `i_control_dist` | double | `0.0` | 積分制御距離 (QGC公開) |
-| `i_limit` | double | `0.0` | 積分リミット (QGC公開) |
-| `linear_velocity` | double | `0.0` | 目標直進速度 (QGC公開) |
 
 「QGC公開」のパラメータは QGroundControl の Parameters 画面から読み書き可能。
 QGC から PARAM_SET を受信すると、MAVLink 応答と同時に ROS2 パラメータも更新される。
