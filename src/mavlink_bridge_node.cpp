@@ -27,7 +27,6 @@ const std::vector<MAVLinkBridgeNode::ParamEntry>& MAVLinkBridgeNode::paramEntrie
         {"wp_arrival_dist", 0.1f},
         {"wp_skip_dist",    0.8f},
         {"throttle_range",  250.0f},
-        {"steering_range",  500.0f},
         {"pivot_range",     250.0f},
         {"driver_mix",      0.0f},
         {"pwm_center",      1500.0f},
