@@ -36,7 +36,6 @@ const std::vector<MAVLinkBridgeNode::ParamEntry>& MAVLinkBridgeNode::paramEntrie
         {"throttle_reverse", 0.0f},
         {"K_rudder",        0.0f},
         {"rudder_center",   1500.0f},
-        {"rudder_range",    500.0f},
         {"rudder_min",      1000.0f},
         {"rudder_max",      2000.0f},
         {"rudder_reverse",  0.0f},
