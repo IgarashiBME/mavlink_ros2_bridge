@@ -121,6 +121,10 @@ MAVLinkBridgeNode::MAVLinkBridgeNode()
     mission_request_timer_ = create_wall_timer(30ms,
         std::bind(&MAVLinkBridgeNode::onMissionRequestTimer, this));
     mission_request_timer_->cancel();  // inactive until mission download begins
+
+    param_send_timer_ = create_wall_timer(50ms,
+        std::bind(&MAVLinkBridgeNode::onParamSendTimer, this));
+    param_send_timer_->cancel();  // inactive until PARAM_REQUEST_LIST
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +258,14 @@ void MAVLinkBridgeNode::onReceiveTimer()
     uint8_t buf[MAVLINK_MAX_PACKET_LEN];
     ssize_t recsize;
     while ((recsize = socket_.receive(buf, sizeof(buf))) > 0) {
+        // Log remote endpoint changes (NAT diagnostics)
+        std::string ep = socket_.remote_endpoint();
+        if (ep != last_remote_endpoint_) {
+            RCLCPP_INFO(get_logger(), "Remote endpoint updated: %s → %s",
+                         last_remote_endpoint_.c_str(), ep.c_str());
+            last_remote_endpoint_ = ep;
+        }
+
         mavlink_message_t msg;
         mavlink_status_t status;
         for (ssize_t i = 0; i < recsize; ++i) {
@@ -354,17 +366,33 @@ void MAVLinkBridgeNode::handleSetMode(const mavlink_message_t& msg)
 
 void MAVLinkBridgeNode::handleParamRequestList()
 {
-    RCLCPP_INFO(get_logger(), "PARAM_REQUEST_LIST received — sending %zu parameters",
+    RCLCPP_INFO(get_logger(), "PARAM_REQUEST_LIST received — queueing %zu parameters",
                  paramEntries().size());
+
+    // Build send queue (indices 0..N-1) and start paced sending
+    param_send_queue_.clear();
+    const uint16_t count = static_cast<uint16_t>(paramEntries().size());
+    for (uint16_t i = 0; i < count; ++i) {
+        param_send_queue_.push_back(i);
+    }
+    param_send_timer_->reset();
+}
+
+void MAVLinkBridgeNode::onParamSendTimer()
+{
+    if (param_send_queue_.empty()) {
+        param_send_timer_->cancel();
+        return;
+    }
 
     const auto& entries = paramEntries();
     const uint16_t count = static_cast<uint16_t>(entries.size());
+    uint16_t idx = param_send_queue_.front();
+    param_send_queue_.erase(param_send_queue_.begin());
 
-    for (uint16_t i = 0; i < count; ++i) {
-        float value = static_cast<float>(
-            get_parameter(entries[i].name).as_double());
-        sendParamValue(entries[i].name, value, MAVLINK_TYPE_FLOAT, count, i);
-    }
+    float value = static_cast<float>(
+        get_parameter(entries[idx].name).as_double());
+    sendParamValue(entries[idx].name, value, MAVLINK_TYPE_FLOAT, count, idx);
 }
 
 void MAVLinkBridgeNode::handleParamSet(const mavlink_message_t& msg)

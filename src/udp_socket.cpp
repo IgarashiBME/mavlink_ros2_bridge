@@ -76,8 +76,20 @@ ssize_t UDPSocket::receive(uint8_t* buffer, size_t max_length)
     if (fd_ < 0) {
         return -1;
     }
-    socklen_t from_len = sizeof(remote_addr_);
-    return ::recvfrom(fd_, buffer, max_length, 0,
-                      reinterpret_cast<sockaddr*>(&remote_addr_),
-                      &from_len);
+    sockaddr_in sender_addr{};
+    socklen_t from_len = sizeof(sender_addr);
+    ssize_t n = ::recvfrom(fd_, buffer, max_length, 0,
+                           reinterpret_cast<sockaddr*>(&sender_addr),
+                           &from_len);
+    if (n > 0) {
+        remote_addr_ = sender_addr;
+    }
+    return n;
+}
+
+std::string UDPSocket::remote_endpoint() const
+{
+    char ip_str[INET_ADDRSTRLEN];
+    ::inet_ntop(AF_INET, &remote_addr_.sin_addr, ip_str, sizeof(ip_str));
+    return std::string(ip_str) + ":" + std::to_string(ntohs(remote_addr_.sin_port));
 }

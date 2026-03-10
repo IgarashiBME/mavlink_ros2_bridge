@@ -21,6 +21,9 @@ public:
     ssize_t send(const uint8_t* data, size_t length);
     ssize_t receive(uint8_t* buffer, size_t max_length);
 
+    /// Return the current remote address as "ip:port" string (for diagnostics)
+    std::string remote_endpoint() const;
+
 private:
     int fd_ = -1;
     sockaddr_in remote_addr_{};

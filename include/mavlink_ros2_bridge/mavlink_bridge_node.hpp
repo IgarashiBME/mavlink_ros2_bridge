@@ -71,6 +71,14 @@ private:
     float cross_track_error_ = 0.0f;
     float angular_z_ = 0.0f;
 
+    // --- Parameter send queue (paced for high-latency links) ---
+    std::vector<uint16_t> param_send_queue_;
+    rclcpp::TimerBase::SharedPtr param_send_timer_;
+    void onParamSendTimer();
+
+    // --- Remote endpoint logging ---
+    std::string last_remote_endpoint_;
+
     // --- Timers ---
     rclcpp::TimerBase::SharedPtr heartbeat_timer_;
     rclcpp::TimerBase::SharedPtr receive_timer_;
