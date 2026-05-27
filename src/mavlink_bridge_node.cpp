@@ -42,6 +42,10 @@ const std::vector<MAVLinkBridgeNode::ParamEntry>& MAVLinkBridgeNode::paramEntrie
         {"cmd_vel_speed",   0.5f},
         {"cmd_vel_steer_scale", 0.002f},
         {"cmd_vel_pivot_rate", 0.5f},
+        {"gnss_ofs_fwd",    0.0f},
+        {"gnss_ofs_left",   0.0f},
+        {"gnss_ofs_up",     0.0f},
+        {"gnss_ofs_yaw",    0.0f},
     };
     return entries;
 }
