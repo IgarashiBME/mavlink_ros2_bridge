@@ -123,7 +123,10 @@ ros2 run mavlink_ros2_bridge mavlink_ros2_bridge_node --ros-args -p gcs_ip:=192.
 | `gcs_ip` | string | `"127.0.0.1"` | GCS の IP アドレス（初期送信先） |
 | `mission_total_seq` | int | `0` | ミッション総ウェイポイント数 |
 | `Kp` | double | `0.0` | PID 比例ゲイン (QGC公開) |
-| `Ki` | double | `0.0` | PID 積分ゲイン (QGC公開) |
+| `Ki_cte` | double | `2.0` | CTE 積分ゲイン (QGC公開) |
+| `cte_i_limit` | double | `1.5` | CTE 積分値の上限 (QGC公開) |
+| `cte_i_active` | double | `0.8` | CTE 積分を有効にする横偏差範囲 (QGC公開) |
+| `cte_i_decay` | double | `0.98` | CTE 積分停止時の減衰率 (QGC公開) |
 | `Kd` | double | `0.0` | PID 微分ゲイン (QGC公開) |
 | `look_ahead` | double | `0.0` | 前方注視距離 (QGC公開) |
 
