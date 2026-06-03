@@ -31,6 +31,12 @@ private:
     struct ParamEntry {
         std::string name;
         float default_value;
+        std::string ros_name = "";
+
+        const std::string& rosName() const
+        {
+            return ros_name.empty() ? name : ros_name;
+        }
     };
     static const std::vector<ParamEntry>& paramEntries();
 
@@ -54,6 +60,7 @@ private:
     // Parameter protocol
     bool param_set_pending_ = false;
     char pending_param_id_[17] = {};
+    std::string pending_ros_param_name_;
     float pending_param_value_ = 0.0f;
     uint8_t pending_param_type_ = 0;
 
@@ -127,5 +134,6 @@ private:
     void sendMavlinkMessage(mavlink_message_t& msg);
     void sendParamValue(const std::string& param_id, float value, uint8_t type,
                         uint16_t count, uint16_t index);
+    std::string resolveParamName(const std::string& param_id) const;
     uint64_t microsSinceEpoch() const;
 };

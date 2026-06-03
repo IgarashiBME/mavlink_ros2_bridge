@@ -37,6 +37,8 @@ const std::vector<MAVLinkBridgeNode::ParamEntry>& MAVLinkBridgeNode::paramEntrie
         {"pwm_max",         2000.0f},
         {"steering_reverse", 0.0f},
         {"throttle_reverse", 0.0f},
+        {"l_motor_reverse", 0.0f, "left_motor_reverse"},
+        {"r_motor_reverse", 0.0f, "right_motor_reverse"},
         {"K_rudder",        0.0f},
         {"rudder_center",   1500.0f},
         {"rudder_min",      1000.0f},
@@ -86,11 +88,14 @@ MAVLinkBridgeNode::MAVLinkBridgeNode()
     // Declare QGC-exposed parameters (use saved values as defaults when available)
     for (const auto& entry : paramEntries()) {
         double default_val = static_cast<double>(entry.default_value);
-        auto it = saved.find(entry.name);
+        auto it = saved.find(entry.rosName());
+        if (it == saved.end()) {
+            it = saved.find(entry.name);
+        }
         if (it != saved.end()) {
             default_val = it->second;
         }
-        declare_parameter<double>(entry.name, default_val);
+        declare_parameter<double>(entry.rosName(), default_val);
     }
 
     // Open UDP socket: receive on 14551, send to GCS on 14550
@@ -251,12 +256,12 @@ void MAVLinkBridgeNode::onReceiveTimer()
         // Update the ROS2 parameter
         try {
             set_parameter(rclcpp::Parameter(
-                std::string(pending_param_id_),
+                pending_ros_param_name_,
                 static_cast<double>(pending_param_value_)));
             saveParameters();
         } catch (const rclcpp::exceptions::ParameterNotDeclaredException&) {
-            RCLCPP_WARN(get_logger(), "Parameter '%s' not declared, skipping update",
-                         pending_param_id_);
+            RCLCPP_WARN(get_logger(), "Parameter '%s' resolved to '%s' is not declared, skipping update",
+                         pending_param_id_, pending_ros_param_name_.c_str());
         }
 
         param_set_pending_ = false;
@@ -399,7 +404,7 @@ void MAVLinkBridgeNode::onParamSendTimer()
     param_send_queue_.erase(param_send_queue_.begin());
 
     float value = static_cast<float>(
-        get_parameter(entries[idx].name).as_double());
+        get_parameter(entries[idx].rosName()).as_double());
     sendParamValue(entries[idx].name, value, MAVLINK_TYPE_FLOAT, count, idx);
 }
 
@@ -414,6 +419,7 @@ void MAVLinkBridgeNode::handleParamSet(const mavlink_message_t& msg)
     std::memset(pending_param_id_, 0, sizeof(pending_param_id_));
     std::memcpy(pending_param_id_, decoded.param_id, 16);
 
+    pending_ros_param_name_ = resolveParamName(pending_param_id_);
     pending_param_value_ = decoded.param_value;
     pending_param_type_  = decoded.param_type;
     param_set_pending_   = true;
@@ -642,6 +648,26 @@ void MAVLinkBridgeNode::sendParamValue(const std::string& param_id, float value,
     sendMavlinkMessage(msg);
 }
 
+std::string MAVLinkBridgeNode::resolveParamName(const std::string& param_id) const
+{
+    for (const auto& entry : paramEntries()) {
+        if (param_id == entry.name || param_id == entry.rosName()) {
+            return entry.rosName();
+        }
+    }
+
+    // Legacy QGC caches may still send MAVLink-truncated names from the
+    // previous 18/19-character parameter IDs.
+    if (param_id == "left_motor_rever") {
+        return "left_motor_reverse";
+    }
+    if (param_id == "right_motor_reve") {
+        return "right_motor_reverse";
+    }
+
+    return param_id;
+}
+
 uint64_t MAVLinkBridgeNode::microsSinceEpoch() const
 {
     struct timeval tv;
@@ -708,8 +734,8 @@ void MAVLinkBridgeNode::saveParameters()
     }
 
     for (const auto& entry : paramEntries()) {
-        double value = get_parameter(entry.name).as_double();
-        ofs << entry.name << ": " << value << "\n";
+        double value = get_parameter(entry.rosName()).as_double();
+        ofs << entry.rosName() << ": " << value << "\n";
     }
 
     RCLCPP_INFO(get_logger(), "Saved parameters to %s", param_file_path_.c_str());
